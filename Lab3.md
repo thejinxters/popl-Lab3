@@ -4,7 +4,24 @@
 
   <em> Give one test case that behaves differently under dynamic scoping versus static scoping (and does not crash). Explain the test case and how they behave differently in your write-up. </em>
 
-    Answer to question 1 goes here
+  Answer to question 1 goes here
+  ```javascript
+  function container(){
+
+    function f1(){
+      var x = 2;
+      f2();
+    }
+
+    function f2(){
+      console.log(x);
+    }
+
+    x = 3;
+    f1();
+
+  }
+  ```
 
 #### 2. JavaScripty Interpreter: Substitution and Evaluation Order.
 
@@ -50,7 +67,3 @@ right tack: &#8866;
 not sign: &not;
 
 subscript: e<sub>1</sub>
-
-
-
-

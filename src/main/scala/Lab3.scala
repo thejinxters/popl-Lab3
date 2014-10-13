@@ -102,6 +102,25 @@ object Lab3 extends jsy.util.JsyApplication {
     }
   }
 
+  /*
+   * Helper function that implements the semantics of equality
+   * operators Eq, Ne on values.
+   */
+  def equalityVal(bop: Bop, v1: Expr, v2: Expr): Boolean = {
+    require(isValue(v1))
+    require(isValue(v2))
+    require(bop == Eq || bop == Ne)
+    (v1, v2) match{
+      case (Function(_, _, _), _)=> throw new UnsupportedOperationException
+      case (_,Function(_, _, _)) => throw new UnsupportedOperationException
+      case (e1, e2) => (bop: @unchecked) match{
+        case Eq => e1 == e2;
+        case Ne => e1 != e2;
+      }
+
+    }
+  }
+
 
   /* Big-Step Interpreter with Dynamic Scoping */
 
@@ -134,7 +153,7 @@ object Lab3 extends jsy.util.JsyApplication {
       case Binary(Times, e1, e2) => N(eToN(e1) * eToN(e2))
       case Binary(Div, e1, e2) => N(eToN(e1) / eToN(e2))
 
-      case Binary(bop @ (Eq | Ne), e1, e2) => throw new UnsupportedOperationException
+      case Binary(bop @ (Eq | Ne), e1, e2) => B(equalityVal(bop, eToVal(e1), eToVal(e2)))
       case Binary(bop @ (Lt|Le|Gt|Ge), e1, e2) => B(inequalityVal(bop, eToVal(e1), eToVal(e2)))
 
       case Binary(And, e1, e2) =>
@@ -149,6 +168,23 @@ object Lab3 extends jsy.util.JsyApplication {
       case If(e1, e2, e3) => if (eToB(e1)) eToVal(e2) else eToVal(e3)
 
       case ConstDecl(x, e1, e2) => eval(extend(env, x, eToVal(e1)), e2)
+
+      case Call(e1, e2) => (e1, eToVal(e2)) match{
+        case (Function(p,x,f1), v2) =>{
+          p match {
+            case Some(string) => {
+              val env2 = extend(env, string, e1)
+              eval(extend(env2, x, v2), f1)
+            }
+            case _ => eval(extend(env, x, v2), f1)
+            }
+        }
+        case (Var(x),v2) => {
+         val f = get(env, x)
+         eval(env, Call(f,v2))
+        }
+        case _ => throw new UnsupportedOperationException
+      }
 
       case _ => throw new UnsupportedOperationException
     }
