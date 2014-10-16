@@ -111,8 +111,8 @@ object Lab3 extends jsy.util.JsyApplication {
     require(isValue(v2))
     require(bop == Eq || bop == Ne)
     (v1, v2) match{
-      case (Function(_, _, _), _)=> throw new UnsupportedOperationException
-      case (_,Function(_, _, _)) => throw new UnsupportedOperationException
+      case (Function(_, _, _), _)=> throw DynamicTypeError(v1)
+      case (_,Function(_, _, _)) => throw DynamicTypeError(v2)
       case (e1, e2) => (bop: @unchecked) match{
         case Eq => e1 == e2;
         case Ne => e1 != e2;
@@ -183,10 +183,10 @@ object Lab3 extends jsy.util.JsyApplication {
          val f = get(env, x)
          eval(env, Call(f,v2))
         }
-        case _ => throw new UnsupportedOperationException
+        case _ => throw DynamicTypeError(e1)
       }
 
-      case _ => throw new UnsupportedOperationException
+      case _ => throw DynamicTypeError(e)
     }
   }
 
@@ -209,14 +209,35 @@ object Lab3 extends jsy.util.JsyApplication {
   def step(e: Expr): Expr = {
     e match {
       /* Base Cases: Do Rules */
+      case v1 if isValue(v1) => v1
+      case Unary(Neg, v1) if isValue(v1) => N(-toNumber(v1))
+      case Unary(Not, v1) if isValue(v1) => B(!toBoolean(v1))
+      case Binary(bop, v1, v2) if isValue(v1) && isValue(v2) => bop match{
+        case Plus => (v1, v2) match {
+          case (S(s), _) => S(s + toStr(v2))
+          case (_, S(s)) => S(toStr(v1) + s)
+          case _ => N(toNumber(v1) + toNumber(v2))
+        }
+        case Minus => N(toNumber(v1) - toNumber(v2))
+        case Times => N(toNumber(v1) * toNumber(v2))
+        case Div => N(toNumber(v1) / toNumber(v2))
+        case Lt | Le | Gt | Ge => B(inequalityVal(bop, v1, v2))
+        case Eq | Ne => B(equalityVal(bop, v1, v2))
+      }
+      case Binary(bop, v1, e2) if isValue(v1) => bop match {
+        case Seq => v1; step (e2)
+        case And => if (toBoolean(v1)) step(e2) else v1
+        case Or => if (toBoolean(v1)) v1 else step(e2)
+      }
       case Print(v1) if isValue(v1) => println(pretty(v1)); Undefined
-
-        // ****** Your cases here
+      case If(v1, e2, e3) if isValue(v1) => if (toBoolean(v1)) step(e2) else step(e3)
+      case ConstDecl(x,v1,e2) if isValue(v1) =>  throw new UnsupportedOperationException
+      case Call(v1, v2) => throw new UnsupportedOperationException
 
       /* Inductive Cases: Search Rules */
       case Print(e1) => Print(step(e1))
 
-        // ****** Your cases here
+      // ****** Your cases here
 
       /* Cases that should never match. Your cases above should ensure this. */
       case Var(_) => throw new AssertionError("Gremlins: internal error, not closed expression.")
