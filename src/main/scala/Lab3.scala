@@ -202,6 +202,13 @@ object Lab3 extends jsy.util.JsyApplication {
     e match {
       case N(_) | B(_) | Undefined | S(_) => e
       case Print(e1) => Print(subst(e1))
+      case Var(y) if y == x => v
+      case Unary(op, e1) => Unary(op, subst(e1))
+      case Binary(op, e1, e2) => Binary(op, e1, e2)
+      case If(e1, e2, e3) => If(subst(e1), subst(e2), subst(e3))
+      // Check for free variable (pg 51 of evan chang -- I think its okay because the substitution substitutes a value, not an expression)
+      case ConstDecl(y,e1,e2) if y != x => ConstDecl(x, subst(e1), subst(e2))
+      case Call(e1, e2) => Call(subst(e1), subst(e2))
       case _ => throw new UnsupportedOperationException
     }
   }
@@ -209,7 +216,6 @@ object Lab3 extends jsy.util.JsyApplication {
   def step(e: Expr): Expr = {
     e match {
       /* Base Cases: Do Rules */
-      case v1 if isValue(v1) => v1
       case Unary(Neg, v1) if isValue(v1) => N(-toNumber(v1))
       case Unary(Not, v1) if isValue(v1) => B(!toBoolean(v1))
       case Binary(bop, v1, v2) if isValue(v1) && isValue(v2) => bop match{
@@ -225,14 +231,14 @@ object Lab3 extends jsy.util.JsyApplication {
         case Eq | Ne => B(equalityVal(bop, v1, v2))
       }
       case Binary(bop, v1, e2) if isValue(v1) => bop match {
-        case Seq => v1; step (e2)
-        case And => if (toBoolean(v1)) step(e2) else v1
-        case Or => if (toBoolean(v1)) v1 else step(e2)
+        case Seq => v1; e2
+        case And => if (toBoolean(v1)) e2 else v1
+        case Or => if (toBoolean(v1)) v1 else e2
       }
       case Print(v1) if isValue(v1) => println(pretty(v1)); Undefined
-      case If(v1, e2, e3) if isValue(v1) => if (toBoolean(v1)) step(e2) else step(e3)
-      case ConstDecl(x,v1,e2) if isValue(v1) =>  throw new UnsupportedOperationException
-      case Call(v1, v2) => throw new UnsupportedOperationException
+      case If(v1, e2, e3) if isValue(v1) => if (toBoolean(v1)) e2 else e3
+      case ConstDecl(x,v1,e2) if isValue(v1) =>  substitute(e2,v1,x)
+      case Call(Function(p,x,e1), v2) if isValue(v2) => substitute(e1,v2,x)
 
       /* Inductive Cases: Search Rules */
       case Print(e1) => Print(step(e1))
