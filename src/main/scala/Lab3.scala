@@ -169,11 +169,11 @@ object Lab3 extends jsy.util.JsyApplication {
 
       case ConstDecl(x, e1, e2) => eval(extend(env, x, eToVal(e1)), e2)
 
-      case Call(e1, e2) => (e1, eToVal(e2)) match{
+      case Call(e1, e2) => (eToVal(e1), eToVal(e2)) match{
         case (Function(p,x,f1), v2) =>{
           p match {
             case Some(string) => {
-              val env2 = extend(env, string, e1)
+              val env2 = extend(env, string, eToVal(e1))
               eval(extend(env2, x, v2), f1)
             }
             case _ => eval(extend(env, x, v2), f1)
@@ -199,6 +199,7 @@ object Lab3 extends jsy.util.JsyApplication {
      * with the input value v and variable name x. */
     def subst(e: Expr): Expr = substitute(e, v, x)
     /* Body */
+    Print(e)
     e match {
       case N(_) | B(_) | Undefined | S(_) => e
       case Print(e1) => Print(subst(e1))
@@ -214,7 +215,8 @@ object Lab3 extends jsy.util.JsyApplication {
         case y if y == x => ConstDecl(y, subst(e1), e2)
         case _ => ConstDecl(str, subst(e1), subst(e2))
       }
-      case Call(e1, e2) => Call(e1, subst(e2))
+      case Call(Var(f), e2) => Call(subst(Var(f)), subst(e2))
+      case Call(Function(p, x, e1), e2) => Call(Function(p, x, subst(e1)), subst(e2))
       case _ => throw new UnsupportedOperationException
     }
   }
@@ -250,8 +252,8 @@ object Lab3 extends jsy.util.JsyApplication {
       case If(v1, e2, e3) if isValue(v1) => if (toBoolean(v1)) e2 else e3
       case ConstDecl(x,v1,e2) if isValue(v1) =>  substitute(e2,v1,x)
       case Call(Function(p,x,e1), v2) if isValue(v2) => p match{
-        case Some(str) => substitute(e1, e1, str)
-        case _ => substitute(e1,v2,x)
+        case None => substitute(e1,v2,x)
+        case Some(str) => substitute(substitute(e1, v2, x), Function(p,x,e1), str)
       }
 
 
