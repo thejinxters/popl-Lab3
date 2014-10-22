@@ -169,19 +169,15 @@ object Lab3 extends jsy.util.JsyApplication {
 
       case ConstDecl(x, e1, e2) => eval(extend(env, x, eToVal(e1)), e2)
 
-      case Call(e1, e2) => (e1, eToVal(e2)) match{
+      case Call(e1, e2) => (eToVal(e1), eToVal(e2)) match{
         case (Function(p,x,f1), v2) =>{
           p match {
             case Some(string) => {
-              val env2 = extend(env, string, e1)
+              val env2 = extend(env, string, eToVal(e1))
               eval(extend(env2, x, v2), f1)
             }
-            case _ => eval(extend(env, x, v2), f1)
+            case None => eval(extend(env, x, v2), f1)
             }
-        }
-        case (Var(x),v2) => {
-         val f = get(env, x)
-         eval(env, Call(f,v2))
         }
         case _ => throw DynamicTypeError(e1)
       }
@@ -199,8 +195,13 @@ object Lab3 extends jsy.util.JsyApplication {
      * with the input value v and variable name x. */
     def subst(e: Expr): Expr = substitute(e, v, x)
     /* Body */
+    Print(e)
     e match {
       case N(_) | B(_) | Undefined | S(_) => e
+      case Function(p,str,e1) => p match{
+        case Some(f) if f == x => e
+        case _ => if (str == x) e else Function(p,str,subst(e1))
+      }
       case Print(e1) => Print(subst(e1))
       case Var(str) => str match {
         case y if y == x => v
@@ -214,7 +215,8 @@ object Lab3 extends jsy.util.JsyApplication {
         case y if y == x => ConstDecl(y, subst(e1), e2)
         case _ => ConstDecl(str, subst(e1), subst(e2))
       }
-      case Call(e1, e2) => Call(e1, subst(e2))
+      case Call(Function(p, x, e1), e2) => Call(Function(p, x, subst(e1)), subst(e2))
+      case Call(e1, e2) => Call(subst(e1), subst(e2))
       case _ => throw new UnsupportedOperationException
     }
   }
@@ -234,10 +236,10 @@ object Lab3 extends jsy.util.JsyApplication {
         case _ => N(toNumber(v1) + toNumber(v2))
       }
       case Binary(Minus, v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1) - toNumber(v2))
-      case Binary(Times, v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1) - toNumber(v2))
+      case Binary(Times, v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1) * toNumber(v2))
       case Binary(Div, v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1) / toNumber(v2))
 
-      case Binary(Seq, v1, e2) if isValue(v1) => e2
+      case Binary(Seq, v1, e2) => e2
       case Binary(And, v1, e2) if isValue(v1) => if (toBoolean(v1)) e2 else v1
       case Binary(Or, v1, e2) if isValue(v1) => if (toBoolean(v1)) v1 else e2
 
@@ -250,10 +252,9 @@ object Lab3 extends jsy.util.JsyApplication {
       case If(v1, e2, e3) if isValue(v1) => if (toBoolean(v1)) e2 else e3
       case ConstDecl(x,v1,e2) if isValue(v1) =>  substitute(e2,v1,x)
       case Call(Function(p,x,e1), v2) if isValue(v2) => p match{
-        case Some(str) => substitute(e1, e1, str)
-        case _ => substitute(e1,v2,x)
+        case None => substitute(e1,v2,x)
+        case Some(str) => substitute(substitute(e1, v2, x), Function(p,x,e1), str)
       }
-
 
 
       /*********************************/
@@ -262,6 +263,7 @@ object Lab3 extends jsy.util.JsyApplication {
 
       case Print(e1) => Print(step(e1))
       case Unary(op, e1) => Unary(op, step(e1))
+
       case Binary(bop, v1, e2) if isValue(v1) => bop match {
         case Plus | Minus | Times | Div | Lt | Le | Gt | Ge => Binary(bop, v1, step(e2))
         case Eq | Ne => v1 match {
@@ -269,11 +271,14 @@ object Lab3 extends jsy.util.JsyApplication {
           case _ => Binary(bop, v1, step(e2))
         }
       }
-      case Binary(op, e1, e2) => Binary(op, step(e1), e2)
+      case Binary(bop, e1, e2) => Binary(bop, step(e1), e2)
 
       case If(e1, e2, e3) => If(step(e1), e2, e3)
       case ConstDecl(x, e1, e2) => ConstDecl(x, step(e1), e2)
       case Call(Function(p, x, e1), e2) => Call(Function(p,x,e1), step(e2))
+      case Call(v1,e2) if isValue(v1) => {
+        throw DynamicTypeError(v1)
+      }
       case Call(e1, e2) => Call(step(e1), e2)
 
       /* Cases that should never match. Your cases above should ensure this. */
@@ -309,6 +314,7 @@ object Lab3 extends jsy.util.JsyApplication {
   // Interface to run your small-step interpreter and print out the steps of evaluation if debugging.
   def iterateStep(e: Expr): Expr = {
     require(closed(e))
+    println("CUSTOM %s".format(e))
     def loop(e: Expr, n: Int): Expr = {
       if (debug) { println("Step %s: %s".format(n, e)) }
       if (isValue(e)) e else loop(step(e), n + 1)
